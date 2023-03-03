@@ -1,0 +1,78 @@
+import hashlib
+import os
+import shutil
+import sqlite3
+from pathlib import Path
+
+from settings import paths, file_pattern, do_original2hash
+
+
+def setup_paths():
+    if not os.path.exists(paths['original_dir']):
+        raise FileNotFoundError(f"{paths['original_dir']} does not exist.")
+    paths['base'] = os.path.dirname(os.path.realpath(__file__))
+    for k, v in paths.items():
+        paths[k] = Path(v)
+    paths['db'] = Path(paths['base'] / 'db.sqlite')
+    Path(paths['hash_dir']).mkdir(parents=True, exist_ok=True)
+
+
+def setup_database():
+    global conn, c, tbl
+    tbl = 'file'
+    conn = sqlite3.connect(paths['db'])
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+
+def original2hash():
+    sql = f"""
+        create table if not exists {tbl}
+    (
+        id             integer                            not null
+            constraint id_pk
+                primary key autoincrement,
+        date           datetime default current_timestamp not null,
+        file_path      TEXT                               not null
+            constraint file_path_unique
+                unique,
+        file_path_hash TEXT                               not null
+            constraint file_path_hash_unique
+                unique
+    );
+        """
+    c.execute(sql)
+    sql = """
+        INSERT INTO file(file_path, file_path_hash)
+        VALUES(?, ?)
+        """
+    for file_path in paths['original_dir'].rglob(file_pattern):
+        file_path_hash = hashlib.md5(str(file_path).encode('utf-8')).hexdigest()
+        c.execute(sql, (str(file_path), file_path_hash))
+        conn.commit()
+        new_file_path = paths['hash_dir'] / f'{file_path_hash}.php'
+        shutil.copyfile(file_path, new_file_path)
+        print(f"{file_path} -> {new_file_path}")
+
+
+def hash2original():
+    sql = f"SELECT * from {tbl}"
+    c.execute(sql)
+    files = c.fetchall()
+    for file in files:
+        old_file_path = paths['hash_dir'] / f'{file["file_path_hash"]}.php'
+        shutil.copyfile(old_file_path, file['file_path'])
+        print(f"{old_file_path} -> {file['file_path']}")
+
+
+def main():
+    setup_paths()
+    setup_database()
+    if do_original2hash:
+        original2hash()
+    else:
+        hash2original()
+
+
+if __name__ == '__main__':
+    main()
