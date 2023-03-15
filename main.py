@@ -11,9 +11,10 @@ def setup_paths():
     if not os.path.exists(paths['original_dir']):
         raise FileNotFoundError(f"{paths['original_dir']} does not exist.")
     paths['base'] = os.path.dirname(os.path.realpath(__file__))
-    for k, v in paths.items():
-        paths[k] = Path(v)
+    for k in ['base', 'original_dir', 'hash_dir']:
+        paths[k] = Path(paths[k])
     paths['db'] = Path(paths['base'] / 'db.sqlite')
+    paths['original_excludes'] = [paths['original_dir'] / p for p in paths['original_excludes']]
     Path(paths['hash_dir']).mkdir(parents=True, exist_ok=True)
 
 
@@ -47,12 +48,16 @@ def original2hash():
         VALUES(?, ?)
         """
     for file_path in paths['original_dir'].rglob(file_pattern):
-        file_path_hash = hashlib.md5(str(file_path).encode('utf-8')).hexdigest()
-        c.execute(sql, (str(file_path), file_path_hash))
-        conn.commit()
-        new_file_path = paths['hash_dir'] / f'{file_path_hash}.php'
-        shutil.copyfile(file_path, new_file_path)
-        print(f"{file_path} -> {new_file_path}")
+        for original_exclude in paths['original_excludes']:
+            if original_exclude in file_path.parents:
+                break
+        else:
+            file_path_hash = hashlib.md5(str(file_path).encode('utf-8')).hexdigest()
+            c.execute(sql, (str(file_path), file_path_hash))
+            conn.commit()
+            new_file_path = paths['hash_dir'] / f'{file_path_hash}.php'
+            shutil.copyfile(file_path, new_file_path)
+            print(f"{file_path} -> {new_file_path}")
 
 
 def hash2original():
