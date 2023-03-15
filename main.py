@@ -39,7 +39,7 @@ def create_table():
         file_path_hash TEXT                               not null,
         constraint     file_path_unique
             unique     (run, file_path),
-        constraint file_path_hash_unique
+        constraint     file_path_hash_unique
             unique     (run, file_path_hash)
     );
         """
@@ -52,8 +52,8 @@ def original2hash():
     sql = f"SELECT MAX(run) FROM {tbl};"
     c.execute(sql)
     max_run = c.fetchone()[0] or 0
-    sql = """
-        INSERT INTO file(run, file_path, file_path_hash)
+    sql = f"""
+        INSERT INTO {tbl}(run, file_path, file_path_hash)
         VALUES(?, ?, ?)
         """
     for file_path in paths['original_dir'].rglob(file_pattern):
@@ -70,7 +70,7 @@ def original2hash():
 
 
 def hash2original():
-    sql = f"SELECT * from {tbl}"
+    sql = f"SELECT * FROM {tbl} WHERE run = (SELECT MAX(run) FROM {tbl})"
     c.execute(sql)
     files = c.fetchall()
     for file in files:
