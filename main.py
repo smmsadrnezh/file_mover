@@ -26,26 +26,35 @@ def setup_database():
     c = conn.cursor()
 
 
-def original2hash():
+def create_table():
     sql = f"""
         create table if not exists {tbl}
     (
         id             integer                            not null
             constraint id_pk
                 primary key autoincrement,
+        run            integer                            not null,
         date           datetime default current_timestamp not null,
-        file_path      TEXT                               not null
-            constraint file_path_unique
-                unique,
-        file_path_hash TEXT                               not null
-            constraint file_path_hash_unique
-                unique
+        file_path      TEXT                               not null,
+        file_path_hash TEXT                               not null,
+        constraint     file_path_unique
+            unique     (run, file_path),
+        constraint file_path_hash_unique
+            unique     (run, file_path_hash)
     );
         """
     c.execute(sql)
+
+
+
+def original2hash():
+    create_table()
+    sql = f"SELECT MAX(run) FROM {tbl};"
+    c.execute(sql)
+    max_run = c.fetchone()[0] or 0
     sql = """
-        INSERT INTO file(file_path, file_path_hash)
-        VALUES(?, ?)
+        INSERT INTO file(run, file_path, file_path_hash)
+        VALUES(?, ?, ?)
         """
     for file_path in paths['original_dir'].rglob(file_pattern):
         for original_exclude in paths['original_excludes']:
@@ -53,7 +62,7 @@ def original2hash():
                 break
         else:
             file_path_hash = hashlib.md5(str(file_path).encode('utf-8')).hexdigest()
-            c.execute(sql, (str(file_path), file_path_hash))
+            c.execute(sql, (max_run + 1, str(file_path), file_path_hash))
             conn.commit()
             new_file_path = paths['hash_dir'] / f'{file_path_hash}.php'
             shutil.copyfile(file_path, new_file_path)
