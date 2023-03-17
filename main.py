@@ -14,7 +14,8 @@ def setup_paths():
     for k in ['base', 'original_dir', 'hash_dir']:
         paths[k] = Path(paths[k])
     paths['db'] = Path(paths['base'] / 'db.sqlite')
-    paths['original_excludes'] = [paths['original_dir'] / p for p in paths['original_excludes']]
+    # paths['original_excludes'] = [paths['original_dir'] / p for p in paths['original_excludes']]
+    paths['original_excludes'] = [p for p in paths['original_excludes']]
     Path(paths['hash_dir']).mkdir(parents=True, exist_ok=True)
 
 
@@ -57,8 +58,16 @@ def original2hash():
         VALUES(?, ?, ?)
         """
     for file_path in paths['original_dir'].rglob(file_pattern):
+        
+        instance_file_path = str(file_path)
+        instance_original_dir = str(paths['original_dir'])
+        reletive = instance_file_path.replace(instance_original_dir,'')
+        dirName = reletive.rsplit('\\', 1)[0]
+        dirList = dirName.split("\\")
+
         for original_exclude in paths['original_excludes']:
-            if original_exclude in file_path.parents:
+            # if original_exclude in file_path.parents:
+            if original_exclude in dirList:
                 break
         else:
             file_path_hash = hashlib.md5(str(file_path).encode('utf-8')).hexdigest()
